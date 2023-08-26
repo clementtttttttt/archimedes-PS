@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="archimedes" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/archimedes" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Debug/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-g" />
+				</Compiler>
+				<Linker>
+					<Add option="-O3" />
+					<Add option="-lglfw" />
+					<Add option="-lGL" />
+					<Add option="-lGLEW" />
+					<Add option="-lchipmunk" />
+				</Linker>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/archimedes" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="0" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+			<Add option="`sdl2-config --cflags`" />
+			<Add option="-Iimgui" />
+			<Add option="-Iimgui/backends" />
+		</Compiler>
+		<Linker>
+			<Add option="`sdl2-config --libs`" />
+			<Add option="-lglfw" />
+			<Add option="-lGL" />
+			<Add option="-lGLEW" />
+			<Add option="-lchipmunk" />
+		</Linker>
+		<Unit filename="gui.cpp" />
+		<Unit filename="gui.hpp" />
+		<Unit filename="imgui/backends/imgui_impl_glfw.cpp" />
+		<Unit filename="imgui/backends/imgui_impl_glfw.h" />
+		<Unit filename="imgui/backends/imgui_impl_opengl3.cpp" />
+		<Unit filename="imgui/backends/imgui_impl_opengl3.h" />
+		<Unit filename="imgui/backends/imgui_impl_opengl3_loader.h" />
+		<Unit filename="imgui/imconfig.h" />
+		<Unit filename="imgui/imgui.cpp" />
+		<Unit filename="imgui/imgui.h" />
+		<Unit filename="imgui/imgui_demo.cpp" />
+		<Unit filename="imgui/imgui_draw.cpp" />
+		<Unit filename="imgui/imgui_internal.h" />
+		<Unit filename="imgui/imgui_tables.cpp" />
+		<Unit filename="imgui/imgui_widgets.cpp" />
+		<Unit filename="imgui/imstb_rectpack.h" />
+		<Unit filename="imgui/imstb_textedit.h" />
+		<Unit filename="imgui/imstb_truetype.h" />
+		<Unit filename="imgui/misc/cpp/imgui_stdlib.cpp" />
+		<Unit filename="imgui/misc/cpp/imgui_stdlib.h" />
+		<Unit filename="loadshader.cpp" />
+		<Unit filename="main.cpp" />
+		<Unit filename="types.hpp" />
+		<Unit filename="world.cpp" />
+		<Unit filename="world.hpp" />
+		<Extensions />
+	</Project>
+</CodeBlocks_project_file>
