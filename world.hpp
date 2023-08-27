@@ -23,7 +23,7 @@ enum A_CON_TS{
 };
 
 void                     world_create_constraint(cpShape *shape, a_vec2 xy, unsigned long type);
-void                     world_create_constraint2(cpShape *shape,cpShape *second, a_vec2 xy, unsigned long type);
+void                     world_create_constraint2(cpShape *shape,cpShape *second, a_vec2 xy, unsigned long type, double prop=1);
 
 enum A_BODY_TS{
     A_BODY_NULL,A_BODY_CIRCLE,A_BODY_POLY
@@ -34,3 +34,4 @@ struct shape_data{
     double z;
     unsigned int type;
 };
+double world_get_tps();

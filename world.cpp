@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <mutex>
 #include <array>
+#include <chrono>
 
 #include <GL/glew.h>
 #include "world.hpp"
@@ -68,7 +69,7 @@ void world_onscroll(GLFWwindow *window, double xoff, double yoff){
 
 }
 
-   cpFloat timeStep = 1.0/300.0;
+   cpFloat timeStep = 1.0/1000.0;
 
 bool phys_paused = false;
  cpSpace *space;
@@ -98,21 +99,69 @@ bool world_toggle_pause(bool in){
     else return phys_paused;
 }
 
+double clock_to_mil(clock_t ticks){
+    // units/(units/time) => time (seconds) * 1000 = milliseconds
+    return (ticks/(double)CLOCKS_PER_SEC)*1000.0;
+}
+
+
+unsigned long ticks = 0;
+double tps;
+
 void world_phys_tick(){
+
+
+            double begin = glfwGetTime();
 
     while(1){
 
-        while(phys_paused){}
+
+        if(phys_paused) {std::this_thread::yield() ;begin = glfwGetTime(); continue;}
+
+        std::this_thread::yield();
 
         phys_tick_lock.lock();
 
         cpSpaceStep(space, timeStep);
 
         phys_tick_lock.unlock();
+std::chrono::duration<double, std::ratio<1>> delta;
 
-        usleep((1000000.0f * timeStep));
+        {
+
+            auto start = std::chrono::steady_clock::now();
+
+            do{
+                auto end = std::chrono::steady_clock::now();
+                 delta = end-start;
+
+
+            }
+            while(delta.count() < timeStep);
+        }
+
+        double end = glfwGetTime();
+
+        ++ticks;
+
+        if((end-begin) >= 1){
+
+            tps = double(ticks);
+            ticks = 0;
+            begin += 1;
+
+           // t.tv_nsec += (1000000000.0d * (-(1.0d/tps - timeStep))) * 0.2;
+
+        }
+
     }
 
+
+}
+
+double world_get_tps(){
+
+    return tps;
 }
 
 cpShape *world_shape_point_query(a_vec2 org_mxy){
@@ -135,7 +184,7 @@ space = cpSpaceNew();
   cpShapeSetFilter(ground,cpShapeFilterNew(CP_NO_GROUP,1,1));
 
             struct shape_data *dat = new struct shape_data;
-            dat->z = 1;
+            dat->z = 0.5;
             dat->type = A_BODY_POLY;
             dat->colour_rgba = 0xddddddff;
     cpShapeSetUserData(ground, dat);
@@ -210,7 +259,7 @@ void world_create_box(a_vec2 mxy,a_vec2 sz){
 
 
             struct shape_data *dat = new struct shape_data;
-            dat->z = 1;
+            dat->z = 0.5;
             dat->type = A_BODY_POLY;
             dat->colour_rgba = 0xddddddff;
 
@@ -237,7 +286,7 @@ cpShape * world_create_circle(cpVect mxy,double rad){
             cpShapeSetFilter(cir, cpShapeFilterNew(CP_NO_GROUP,1,1));
 
             struct shape_data *dat = new struct shape_data;
-            dat->z = 1;
+            dat->z = 0.5;
             dat->type = A_BODY_CIRCLE;
             dat->colour_rgba = 0xddddddff;
 
@@ -374,7 +423,7 @@ using N = unsigned long;
 
 }
 
-void   world_create_constraint2(cpShape *shape, cpShape *shape2, a_vec2 xy, unsigned long type){
+void   world_create_constraint2(cpShape *shape, cpShape *shape2, a_vec2 xy, unsigned long type, double prop){
 
     phys_tick_lock.lock();
 
@@ -384,13 +433,16 @@ void   world_create_constraint2(cpShape *shape, cpShape *shape2, a_vec2 xy, unsi
         case A_CON_HINGE:
             con = cpPivotJointNew(bod, cpShapeGetBody(shape2 ),xy);
             break;
+        case A_CON_GEAR:
+            con = cpGearJointNew(bod, cpShapeGetBody(shape2), 0, prop);
 
     }
 
     struct con_data *user_dat = new struct con_data;
     user_dat->is_mouse = false;
-    user_dat->type = A_CON_HINGE;
+    user_dat->type = type;
 
+    cpConstraintSetCollideBodies(con, cpFalse);
     cpConstraintSetUserData(con, user_dat);
 
     cpSpaceAddConstraint(space, con);
@@ -407,7 +459,6 @@ void                     world_create_constraint(cpShape *shape, a_vec2 xy, unsi
 
 }
 void world_draw_tick(GLfloat *verts){
-    phys_tick_lock.lock();
 
         double ratio;
         int width, height;
@@ -425,10 +476,12 @@ void world_draw_tick(GLfloat *verts){
 
     cpBB screen_bb =  cpBBNewForExtents({cam_pos.x,cam_pos.y}, 1/cam_scale*ratio,999); //FIXME: absolutely no idea on how adding a yoffset fixes stuff. will figure it out later
     struct s_render_info inf = { verts ,glm::inverse(trans)};
+    phys_tick_lock.lock();
 
 
     cpSpaceBBQuery(space, screen_bb, CP_SHAPE_FILTER_ALL, shape_renderer, &inf);
 
+    phys_tick_lock.unlock();
 
     unsigned int transformLoc = glGetUniformLocation(programID, "transform");
 
@@ -436,7 +489,6 @@ void world_draw_tick(GLfloat *verts){
     glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 
 
-    phys_tick_lock.unlock();
 }
 
 

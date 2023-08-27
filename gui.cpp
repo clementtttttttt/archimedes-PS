@@ -125,7 +125,27 @@ void gui_handle_inputs(GLFWwindow *window){
                             }
                     break;
                     case T_WELD:
+                            cpSpacePointQuery(space, org_mxy, 0, CP_SHAPE_FILTER_ALL,
+                            [](cpShape *shape, cpVect point, cpFloat dist, cpVect grad, void *data){
+                                struct query_inf *qinf = (struct query_inf*)data;
+                                if(shape != qinf->mshape){
+                                    if(dist < qinf->dist){
+                                        qinf->shape = shape;
 
+                                    }
+
+                                }
+
+                            }
+                            ,&inf);
+                            if(inf.shape){
+                                world_create_constraint2(mshape, inf.shape,  org_mxy, A_CON_HINGE);
+                                world_create_constraint2(mshape, inf.shape, org_mxy, A_CON_GEAR);
+                            }
+                            else{
+                                world_create_constraint(mshape,  org_mxy, A_CON_HINGE);
+
+                            }
                     break;
 
                 }
@@ -149,12 +169,12 @@ void gui_handle_inputs(GLFWwindow *window){
 
             switch(current_tool){
                 case T_BOX:
-                    pushvert(org_mxy.x,org_mxy.y,1,c);
-                    pushvert(curr_mxy.x,org_mxy.y,1,c);
-                    pushvert(curr_mxy.x,curr_mxy.y,1,c);
-                    pushvert(org_mxy.x,org_mxy.y,1,c);
-                    pushvert(org_mxy.x,curr_mxy.y,1,c);
-                    pushvert(curr_mxy.x,curr_mxy.y,1,c);
+                    pushvert(org_mxy.x,org_mxy.y,0.999,c);
+                    pushvert(curr_mxy.x,org_mxy.y,0.999,c);
+                    pushvert(curr_mxy.x,curr_mxy.y,0.999,c);
+                    pushvert(org_mxy.x,org_mxy.y,0.999,c);
+                    pushvert(org_mxy.x,curr_mxy.y,0.999,c);
+                    pushvert(curr_mxy.x,curr_mxy.y,0.999,c);
 
                 break;
                 case T_MOVE:
@@ -194,7 +214,7 @@ void gui_handle_inputs(GLFWwindow *window){
 
                     for(unsigned int i=0;i<indices.size();++i){
 
-                        pushvert(currp[indices[i]][0], currp[indices[i]][1],1,0xddddddff);
+                        pushvert(currp[indices[i]][0], currp[indices[i]][1],0.999,0xddddddff);
                     }
 
                 break;
@@ -300,6 +320,16 @@ ImGui::NewFrame();
 
     ImGui::Begin("Simulation Control");
 
+    ImGui::LabelText("##tpscounter", "Ticks Per Second=%lf", world_get_tps());
+    extern bool prio_fail;
+
+    if(prio_fail){
+        ImGui::LabelText("##prioerror!", "%s", "WARNING: Not running as an RT program,\nexpect decreased performance.\nMaybe try running as root?");
+    }
+
+    ImGui::Separator();
+
+
     std::string playtext = world_toggle_pause(false) ? "Stopped" : "Running";
     if(ImGui::Button(playtext.c_str())){
         world_toggle_pause(true);
@@ -314,6 +344,8 @@ ImGui::NewFrame();
 
         cpSpaceSetGravity(space, {0,gravity});
     }
+
+
 
     ImGui::End();
 
@@ -335,11 +367,12 @@ ImGui::NewFrame();
             cpShapeSetFriction(mshape, fric);
         }
 
-        unsigned int c = ((struct shape_data*)cpShapeGetUserData(mshape))->colour_rgba;
+        struct shape_data *dat = ((struct shape_data*)cpShapeGetUserData(mshape));
 
-        if(ImGui::InputScalar("Colour(RGBA)", ImGuiDataType_U32, &c, NULL, NULL, "%08X", ImGuiInputTextFlags_CharsHexadecimal)){
-            ((struct shape_data*)cpShapeGetUserData(mshape))->colour_rgba = c;
+        if(ImGui::InputScalar("Colour(RGBA)", ImGuiDataType_U32, &dat->colour_rgba, NULL, NULL, "%08X", ImGuiInputTextFlags_CharsHexadecimal)){
         }
+
+        ImGui::InputDouble("Z-Value", &dat->z);
 
         cpBitmask collmask = cpShapeGetFilter(mshape).categories;
 

@@ -5,6 +5,8 @@
 #include <iostream>
 #include <vector>
 #include "world.hpp"
+#include <unistd.h>
+#include <cstring>
 
 #include "gui.hpp"
 GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path);
@@ -26,9 +28,19 @@ GLuint programID;
 GLfloat vertices[65535*3] ,vert_colours[65535*3];
     GLFWwindow* window;
         unsigned long long count=0;
+bool prio_fail = false;
 
 int main(void)
 {
+
+    struct sched_param p = {1};
+    if(sched_setscheduler(getpid(),SCHED_FIFO,&p)){
+        std::cout << "FAILED TO SET PRIO: ";
+        std::cout << std::strerror(errno) << std::endl;
+        prio_fail = true;
+    }
+
+
     glfwSetErrorCallback(error_callback);
     if (!glfwInit())
         exit(EXIT_FAILURE);
@@ -83,6 +95,8 @@ if (glewInit() != GLEW_OK) {
 
     glfwSetKeyCallback(window, key_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+    glEnable(GL_DEPTH_TEST);
 
     gui_init(window);
     world_init((void*)window);
