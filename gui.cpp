@@ -1,14 +1,22 @@
+#include <GL/glew.h>
+
+
 #include "gui.hpp"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "types.hpp"
 #include "imgui_impl_opengl3.h"
 #include "world.hpp"
+
 #include <mapbox/earcut.hpp>
 #include <iostream>
 #include <array>
 #include <mutex>
 
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 void gui_init(GLFWwindow *win){
 
 IMGUI_CHECKVERSION();
@@ -34,6 +42,7 @@ cpShape *mouse_circle;
 cpConstraint *mouse_spring;
 
 a_vec2 grid_sz = {0.05,0.05};
+a_vec2 grid_off = {0,0};
 bool gui_tool_snap_to_grid = false;
 
 double gui_drag_tool_stiff = 9999, gui_drag_tool_damp = 99;
@@ -86,6 +95,7 @@ void gui_handle_inputs(GLFWwindow *window){
                                 if(shape != qinf->mshape){
                                     if(dist < qinf->dist){
                                         qinf->shape = shape;
+                                        qinf->dist = dist;
 
                                     }
 
@@ -109,7 +119,7 @@ void gui_handle_inputs(GLFWwindow *window){
                                 if(shape != qinf->mshape){
                                     if(dist < qinf->dist){
                                         qinf->shape = shape;
-
+                                        qinf->dist = dist;
                                     }
 
                                 }
@@ -131,7 +141,7 @@ void gui_handle_inputs(GLFWwindow *window){
                                 if(shape != qinf->mshape){
                                     if(dist < qinf->dist){
                                         qinf->shape = shape;
-
+                                        qinf->dist = dist;
                                     }
 
                                 }
@@ -144,6 +154,7 @@ void gui_handle_inputs(GLFWwindow *window){
                             }
                             else{
                                 world_create_constraint(mshape,  org_mxy, A_CON_HINGE);
+                                world_create_constraint(mshape, org_mxy, A_CON_GEAR);
 
                             }
                     break;
@@ -169,12 +180,12 @@ void gui_handle_inputs(GLFWwindow *window){
 
             switch(current_tool){
                 case T_BOX:
-                    pushvert(org_mxy.x,org_mxy.y,0.999,c);
-                    pushvert(curr_mxy.x,org_mxy.y,0.999,c);
-                    pushvert(curr_mxy.x,curr_mxy.y,0.999,c);
-                    pushvert(org_mxy.x,org_mxy.y,0.999,c);
-                    pushvert(org_mxy.x,curr_mxy.y,0.999,c);
-                    pushvert(curr_mxy.x,curr_mxy.y,0.999,c);
+                    pushvert(org_mxy.x,org_mxy.y,-0.999,c);
+                    pushvert(curr_mxy.x,org_mxy.y,-0.999,c);
+                    pushvert(curr_mxy.x,curr_mxy.y,-0.999,c);
+                    pushvert(org_mxy.x,org_mxy.y,-0.999,c);
+                    pushvert(org_mxy.x,curr_mxy.y,-0.999,c);
+                    pushvert(curr_mxy.x,curr_mxy.y,-0.999,c);
 
                 break;
                 case T_MOVE:
@@ -214,7 +225,7 @@ void gui_handle_inputs(GLFWwindow *window){
 
                     for(unsigned int i=0;i<indices.size();++i){
 
-                        pushvert(currp[indices[i]][0], currp[indices[i]][1],0.999,0xddddddff);
+                        pushvert(currp[indices[i]][0], currp[indices[i]][1],-0.999,0xddddddff);
                     }
 
                 break;
@@ -262,6 +273,30 @@ void gui_tick_begin(GLFWwindow *window){
 
     gui_handle_inputs(window);
 
+    extern GLuint programID;
+
+    unsigned int gridsz_loc = glGetUniformLocation(programID, "gridsz_in");
+    unsigned int gridoff_loc = glGetUniformLocation(programID, "gridoff_in");
+    unsigned int screensz_loc = glGetUniformLocation(programID, "screensize_in");
+
+    extern double cam_scale;
+    extern a_vec2 cam_pos;
+            double ratio;
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        glUniform2f(screensz_loc, width,height);
+        ratio = width / (double) height ;
+
+
+    if(gui_tool_snap_to_grid){
+        glUniform2f(gridsz_loc, grid_sz.x * cam_scale / ratio/2, grid_sz.y * cam_scale/2);
+        glUniform2f(gridoff_loc, -fmod(cam_pos.x*cam_scale/ratio/2,grid_sz.x*cam_scale/ratio/2) + 0.5, -fmod(cam_pos.y*cam_scale/2.0 + (cam_scale-1)*0.5 ,grid_sz.y*cam_scale/2));
+    }else{
+        glUniform2f(gridsz_loc, 0, 0);
+        glUniform2f(gridoff_loc, 0, 0);
+
+    }
+
 
 
 }
@@ -271,6 +306,8 @@ bool gui_mouse_hovering(){
     return ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)  || ImGui::IsAnyItemHovered();
 
 }
+
+cpConstraint *mcon;
 
 
 void gui_tick_end(){
@@ -308,7 +345,12 @@ ImGui::NewFrame();
 
     if(ImGui::Button("Rotate")){current_tool = T_ROT;};
 
+    if(current_tool == T_DRAG ){
+        if(ImGui::InputDouble("Drag Stiffness", &gui_drag_tool_stiff)){}
+            if(ImGui::InputDouble("Drag Damping", &gui_drag_tool_damp)){}
+    }
 
+    ImGui::Separator();
 
 
     ImGui::Checkbox("Snap to grid", &gui_tool_snap_to_grid);
@@ -321,11 +363,9 @@ ImGui::NewFrame();
     ImGui::Begin("Simulation Control");
 
     ImGui::LabelText("##tpscounter", "Ticks Per Second=%lf", world_get_tps());
-    extern bool prio_fail;
+   extern double target_tps;
+    ImGui::InputDouble("Target Ticks Per Second", &target_tps);
 
-    if(prio_fail){
-        ImGui::LabelText("##prioerror!", "%s", "WARNING: Not running as an RT program,\nexpect decreased performance.\nMaybe try running as root?");
-    }
 
     ImGui::Separator();
 
@@ -334,6 +374,8 @@ ImGui::NewFrame();
     if(ImGui::Button(playtext.c_str())){
         world_toggle_pause(true);
     };
+
+
 
     double gravity;
 
@@ -423,7 +465,10 @@ ImGui::NewFrame();
 
                 }
 
-                ImGui::Selectable((sel_text + " ##" + std::to_string(++*sel_id)).c_str());
+                if(ImGui::Selectable((sel_text + " ##" + std::to_string(++*sel_id)).c_str())){
+
+
+                }
 
 
           } , &sel_id);
@@ -466,4 +511,6 @@ ImGui::NewFrame();
 // (Your code clears your framebuffer, renders your other stuff etc.)
 ImGui::Render();
 ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+
 }

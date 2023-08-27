@@ -33,13 +33,6 @@ bool prio_fail = false;
 int main(void)
 {
 
-    struct sched_param p = {1};
-    if(sched_setscheduler(getpid(),SCHED_FIFO,&p)){
-        std::cout << "FAILED TO SET PRIO: ";
-        std::cout << std::strerror(errno) << std::endl;
-        prio_fail = true;
-    }
-
 
     glfwSetErrorCallback(error_callback);
     if (!glfwInit())
@@ -105,7 +98,6 @@ if (glewInit() != GLEW_OK) {
     {
 
         count=0;
-        glClearColor(0.5294117647f, 0.80784313725f, 0.92156862745f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
@@ -147,6 +139,7 @@ if (glewInit() != GLEW_OK) {
 
 
                 glBufferData(GL_ARRAY_BUFFER, count*sizeof(GLfloat), vert_colours, GL_DYNAMIC_DRAW);
+
 
 
         // Draw the triangle !

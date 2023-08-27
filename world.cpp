@@ -54,7 +54,7 @@ a_vec2 cam_pos={0,0},start_cam_pos;
 bool press_ack = false;
 double start_mx,start_my;
 unsigned long cam_speed = 240;
-double cam_scale = 1.8;
+double cam_scale = 1;
 
 bool do_pan=true;
 
@@ -69,7 +69,6 @@ void world_onscroll(GLFWwindow *window, double xoff, double yoff){
 
 }
 
-   cpFloat timeStep = 1.0/1000.0;
 
 bool phys_paused = false;
  cpSpace *space;
@@ -104,10 +103,10 @@ double clock_to_mil(clock_t ticks){
     return (ticks/(double)CLOCKS_PER_SEC)*1000.0;
 }
 
-
+double target_tps = 1000;
 unsigned long ticks = 0;
 double tps;
-
+double t_off;
 void world_phys_tick(){
 
 
@@ -115,6 +114,7 @@ void world_phys_tick(){
 
     while(1){
 
+        cpFloat timeStep = 1.0/target_tps;
 
         if(phys_paused) {std::this_thread::yield() ;begin = glfwGetTime(); continue;}
 
@@ -137,7 +137,7 @@ std::chrono::duration<double, std::ratio<1>> delta;
 
 
             }
-            while(delta.count() < timeStep);
+            while(delta.count() < (timeStep + t_off));
         }
 
         double end = glfwGetTime();
@@ -150,9 +150,10 @@ std::chrono::duration<double, std::ratio<1>> delta;
             ticks = 0;
             begin += 1;
 
-           // t.tv_nsec += (1000000000.0d * (-(1.0d/tps - timeStep))) * 0.2;
 
-        }
+                if((timeStep + (t_off - (1/tps-1/target_tps))) > 0)
+                t_off -= (1/tps - 1/target_tps);
+                    }
 
     }
 
@@ -190,6 +191,7 @@ space = cpSpaceNew();
     cpShapeSetUserData(ground, dat);
     std::thread physics_thread(world_phys_tick);
 
+    cpSpaceSetCollisionSlop(space, 0.00000000001);
 
     physics_thread.detach();
 }
@@ -476,12 +478,20 @@ void world_draw_tick(GLfloat *verts){
 
     cpBB screen_bb =  cpBBNewForExtents({cam_pos.x,cam_pos.y}, 1/cam_scale*ratio,999); //FIXME: absolutely no idea on how adding a yoffset fixes stuff. will figure it out later
     struct s_render_info inf = { verts ,glm::inverse(trans)};
+
+
     phys_tick_lock.lock();
 
 
     cpSpaceBBQuery(space, screen_bb, CP_SHAPE_FILTER_ALL, shape_renderer, &inf);
 
     phys_tick_lock.unlock();
+         pushvert(screen_bb.l-1,screen_bb.t+1,0.99,0x87CEEBff);
+        pushvert(screen_bb.l-1,screen_bb.b-1,0.99,0x87CEEBff);
+        pushvert(screen_bb.r+1,screen_bb.b-1,0.99,0x87CEEBff);
+        pushvert(screen_bb.l-1,screen_bb.t+1,0.99,0x87CEEBff);
+        pushvert(screen_bb.r+1,screen_bb.t+1,0.99,0x87CEEBff);
+        pushvert(screen_bb.r+1,screen_bb.b-1,0.99,0x87CEEBff);
 
     unsigned int transformLoc = glGetUniformLocation(programID, "transform");
 
