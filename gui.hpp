@@ -7,7 +7,7 @@ void world_init(GLFWwindow *win);
 bool gui_mouse_hovering();
 
 enum A_TOOLS{
-    T_NULL,T_BOX,T_CIRCLE,T_MOVE,T_ROT,T_DRAG, T_PIN_CENTRE, T_WELD, T_HINGE
+    T_NULL,T_BOX,T_CIRCLE,T_MOVE,T_ROT,T_DRAG, T_PIN_CENTRE, T_WELD, T_HINGE, T_SPRING
 };
 
 

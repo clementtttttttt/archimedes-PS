@@ -187,7 +187,7 @@ space = cpSpaceNew();
             struct shape_data *dat = new struct shape_data;
             dat->z = 0.5;
             dat->type = A_BODY_POLY;
-            dat->colour_rgba = 0xddddddff;
+            dat->colour_rgba = std::rand() | 0xff;
     cpShapeSetUserData(ground, dat);
     std::thread physics_thread(world_phys_tick);
 
@@ -263,7 +263,7 @@ void world_create_box(a_vec2 mxy,a_vec2 sz){
             struct shape_data *dat = new struct shape_data;
             dat->z = 0.5;
             dat->type = A_BODY_POLY;
-            dat->colour_rgba = 0xddddddff;
+            dat->colour_rgba = std::rand() | 0xff;
 
             cpShapeSetUserData(box, dat);
 
@@ -290,7 +290,7 @@ cpShape * world_create_circle(cpVect mxy,double rad){
             struct shape_data *dat = new struct shape_data;
             dat->z = 0.5;
             dat->type = A_BODY_CIRCLE;
-            dat->colour_rgba = 0xddddddff;
+            dat->colour_rgba = std::rand() | 0xff;
 
             cpShapeSetUserData(cir,(cpDataPointer)dat);
             cpBodySetPosition(cirbody, cpv(mxy.x,mxy.y));
@@ -444,10 +444,10 @@ void   world_create_constraint2(cpShape *shape, cpShape *shape2, a_vec2 xy, unsi
     user_dat->is_mouse = false;
     user_dat->type = type;
 
-    cpConstraintSetCollideBodies(con, cpFalse);
     cpConstraintSetUserData(con, user_dat);
 
     cpSpaceAddConstraint(space, con);
+    cpConstraintSetCollideBodies(con, cpFalse);
 
     phys_tick_lock.unlock();
 

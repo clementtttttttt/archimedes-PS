@@ -40,6 +40,7 @@ a_vec2 mshape_orgmxy;
 cpShape *mshape;
 cpShape *mouse_circle;
 cpConstraint *mouse_spring;
+cpConstraint *mcon;
 
 a_vec2 grid_sz = {0.05,0.05};
 a_vec2 grid_off = {0,0};
@@ -63,6 +64,8 @@ void gui_handle_inputs(GLFWwindow *window){
 
                 org_mxy = get_mouse_world_pos(window,NULL);
                 mshape = world_shape_point_query(org_mxy);
+                mcon = 0;
+
                 if(mshape)
                     mshape_orgmxy = cpBodyGetPosition(cpShapeGetBody(mshape));
 
@@ -307,7 +310,6 @@ bool gui_mouse_hovering(){
 
 }
 
-cpConstraint *mcon;
 
 
 void gui_tick_end(){
@@ -330,6 +332,8 @@ ImGui::NewFrame();
     if(ImGui::Button("Weld")){current_tool = T_WELD;}
     ImGui::SameLine();
     if(ImGui::Button("Hinge")) {current_tool = T_HINGE;};
+    ImGui::SameLine();
+    if(ImGui::Button("Spring")) {current_tool = T_SPRING;};
 
 
     ImGui::Separator();
@@ -445,7 +449,8 @@ ImGui::NewFrame();
 
         ImGui::Separator();
 
-        ImGui::BeginListBox("Connections");
+
+        if(ImGui::BeginListBox("Constraints")){
         unsigned long long sel_id = 0;
 
         cpBodyEachConstraint(cpShapeGetBody(mshape),
@@ -467,7 +472,7 @@ ImGui::NewFrame();
 
                 if(ImGui::Selectable((sel_text + " ##" + std::to_string(++*sel_id)).c_str())){
 
-
+                    mcon = con;
                 }
 
 
@@ -475,6 +480,63 @@ ImGui::NewFrame();
 
 
         ImGui::EndListBox();
+        }
+        if(mcon){
+            struct con_data *dat = (struct con_data*)cpConstraintGetUserData(mcon);
+            if(dat){
+                switch(dat->type){
+                    case A_CON_HINGE:
+                        {
+
+                            cpVect anchora = cpPivotJointGetAnchorA(mcon);
+                            cpVect anchorb = cpPivotJointGetAnchorB(mcon);
+
+                            if(ImGui::InputDouble("Body A X Offset", &anchora.x)){
+                                cpPivotJointSetAnchorA(mcon,anchora);
+                            }
+                            if(ImGui::InputDouble("Body A Y Offset", &anchora.y)){
+                                cpPivotJointSetAnchorA(mcon,anchora);
+                            }
+                            if(ImGui::InputDouble("Body B X Offset", &anchorb.x)){
+                                cpPivotJointSetAnchorB(mcon,anchorb);
+                            }
+                             if(ImGui::InputDouble("Body B Y Offset", &anchorb.y)){
+                                cpPivotJointSetAnchorB(mcon,anchorb);
+                            }
+                            break;
+                        }
+                    case A_CON_SPRING:
+                        {
+
+                            cpVect anchora = cpDampedSpringGetAnchorA(mcon);
+                            cpVect anchorb = cpDampedSpringGetAnchorB(mcon);
+
+                            if(ImGui::InputDouble("Body A X Offset", &anchora.x)){
+                                cpDampedSpringSetAnchorA(mcon,anchora);
+                            }
+                            if(ImGui::InputDouble("Body A Y Offset", &anchora.y)){
+                                cpDampedSpringSetAnchorA(mcon,anchora);
+                            }
+                            if(ImGui::InputDouble("Body B X Offset", &anchorb.x)){
+                                cpDampedSpringSetAnchorB(mcon,anchorb);
+                            }
+                             if(ImGui::InputDouble("Body B Y Offset", &anchorb.y)){
+                                cpDampedSpringSetAnchorB(mcon,anchorb);
+                            }
+
+                            double len = cpDampedSpringGetRestLength(mcon);
+                            double stiff = cpDampedSpringGetStiffness(mcon);
+                            double damp = cpDampedSpringGetStiffness(mcon);
+
+                            break;
+                        }
+
+
+                }
+
+            }
+
+        }
 
         ImGui::Separator();
 
@@ -502,7 +564,7 @@ ImGui::NewFrame();
 
 
             mshape = 0;
-
+            mcon = 0;
         }
 
         ImGui::End();
