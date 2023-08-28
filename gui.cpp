@@ -48,6 +48,8 @@ bool gui_tool_snap_to_grid = false;
 
 double gui_drag_tool_stiff = 9999, gui_drag_tool_damp = 99;
 extern cpSpace *space;
+cpShape *mshapes[2];
+cpVect moff[2];
 void gui_handle_inputs(GLFWwindow *window){
     if(mshape){
         cpShapeFilter filt = cpShapeGetFilter(mshape);
@@ -83,52 +85,27 @@ void gui_handle_inputs(GLFWwindow *window){
                 }
                 if(mshape){
 
-                                            struct query_inf{double dist; cpShape *shape; cpShape *mshape;};
-
-                            struct query_inf inf = {INFINITY, NULL, mshape};
-                                                        cpVect pos = cpBodyGetPosition(cpShapeGetBody(mshape));
 
                 switch(current_tool){
+
                     case T_PIN_CENTRE:
+                            {
+                            cpVect pos = cpBodyGetPosition(cpShapeGetBody(mshape));
 
+                            struct query_inf inf = world_query_shape(mshape, pos);
 
-                            cpSpacePointQuery(space, pos, 0, CP_SHAPE_FILTER_ALL,
-                            [](cpShape *shape, cpVect point, cpFloat dist, cpVect grad, void *data){
-                                struct query_inf *qinf = (struct query_inf*)data;
-                                if(shape != qinf->mshape){
-                                    if(dist < qinf->dist){
-                                        qinf->shape = shape;
-                                        qinf->dist = dist;
-
-                                    }
-
-                                }
-
-                            }
-                            ,&inf);
                             if(inf.shape){
                                 world_create_constraint2(mshape, inf.shape,  pos, A_CON_HINGE);
                             }
                             else{
                                 world_create_constraint(mshape,  pos, A_CON_HINGE);
 
-                            }                    break;
-                    case T_HINGE:
-
-
-                            cpSpacePointQuery(space, org_mxy, 0, CP_SHAPE_FILTER_ALL,
-                            [](cpShape *shape, cpVect point, cpFloat dist, cpVect grad, void *data){
-                                struct query_inf *qinf = (struct query_inf*)data;
-                                if(shape != qinf->mshape){
-                                    if(dist < qinf->dist){
-                                        qinf->shape = shape;
-                                        qinf->dist = dist;
-                                    }
-
-                                }
-
                             }
-                            ,&inf);
+                            break;
+                            }
+                    case T_HINGE:
+                    {
+                            struct query_inf inf = world_query_shape(mshape, org_mxy);
                             if(inf.shape){
                                 world_create_constraint2(mshape, inf.shape,  org_mxy, A_CON_HINGE);
                             }
@@ -137,20 +114,11 @@ void gui_handle_inputs(GLFWwindow *window){
 
                             }
                     break;
+                    }
                     case T_WELD:
-                            cpSpacePointQuery(space, org_mxy, 0, CP_SHAPE_FILTER_ALL,
-                            [](cpShape *shape, cpVect point, cpFloat dist, cpVect grad, void *data){
-                                struct query_inf *qinf = (struct query_inf*)data;
-                                if(shape != qinf->mshape){
-                                    if(dist < qinf->dist){
-                                        qinf->shape = shape;
-                                        qinf->dist = dist;
-                                    }
+                    {
+                                struct query_inf inf = world_query_shape(mshape, org_mxy);
 
-                                }
-
-                            }
-                            ,&inf);
                             if(inf.shape){
                                 world_create_constraint2(mshape, inf.shape,  org_mxy, A_CON_HINGE);
                                 world_create_constraint2(mshape, inf.shape, org_mxy, A_CON_GEAR);
@@ -160,6 +128,16 @@ void gui_handle_inputs(GLFWwindow *window){
                                 world_create_constraint(mshape, org_mxy, A_CON_GEAR);
 
                             }
+                    break;
+                    }
+
+                    case T_SPRING:
+                        {
+                            struct query_inf inf = world_query_shape(NULL, org_mxy);
+                            mshapes[0] = inf.shape;
+                            if(inf.shape)
+                                moff[0] = cpBodyWorldToLocal(cpShapeGetBody(mshapes[0]),org_mxy);
+                        }
                     break;
 
                 }
@@ -254,6 +232,32 @@ void gui_handle_inputs(GLFWwindow *window){
                         world_create_circle(org_mxy, curr_mxy.dist(org_mxy));
                 break;
 
+                case T_SPRING:
+                    {
+                        struct query_inf inf = world_query_shape(NULL, curr_mxy);
+                        if(!inf.shape) break;
+
+                        mshapes[1] = inf.shape;
+                        moff[1] = cpBodyWorldToLocal(cpShapeGetBody(inf.shape),curr_mxy);
+
+
+                        double len = curr_mxy.dist(org_mxy);
+
+                        if(mshapes[0]){
+                            mcon = world_create_constraint2(mshapes[0], mshapes[1],cpvzero,A_CON_SPRING,len);
+                        }
+                        else{
+                            mcon = world_create_constraint(mshapes[1], cpvzero, A_CON_SPRING);
+                        }
+
+                        cpDampedSpringSetRestLength(mcon, len);
+
+                        cpDampedSpringSetAnchorA(mcon, moff[0]);
+                        cpDampedSpringSetAnchorA(mcon, moff[1]);
+
+
+                    }
+                    break;
 
         }
 
@@ -261,9 +265,10 @@ void gui_handle_inputs(GLFWwindow *window){
         }
 
         if(mouse_circle && mouse_spring){
+
             world_remove_shape(mouse_circle);
-            delete (struct con_data*)cpConstraintGetUserData(mouse_spring);
-            cpConstraintDestroy(mouse_spring);
+
+
             mouse_spring = 0;
             mouse_circle = 0;
         }
@@ -526,14 +531,36 @@ ImGui::NewFrame();
 
                             double len = cpDampedSpringGetRestLength(mcon);
                             double stiff = cpDampedSpringGetStiffness(mcon);
-                            double damp = cpDampedSpringGetStiffness(mcon);
+                            double damp = cpDampedSpringGetDamping(mcon);
 
+                            if(ImGui::InputDouble("Rest Length", &len)){
+                                cpDampedSpringSetRestLength(mcon, len);
+                            }
+
+                            if(ImGui::InputDouble("Stiffness", &stiff)){
+                                cpDampedSpringSetStiffness(mcon, stiff);
+                            }
+                            if(ImGui::InputDouble("Damping", &damp)){
+                                cpDampedSpringSetDamping(mcon, damp);
+                            }
                             break;
                         }
+                    case A_CON_GEAR:
+                        {
+
+
+                        }
+
 
 
                 }
 
+            }
+
+            if(ImGui::Button("Delete Constraint")){
+                cpSpaceRemoveConstraint(space,mcon);
+                cpConstraintFree(mcon);
+                mcon = 0;
             }
 
         }

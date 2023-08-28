@@ -17,13 +17,15 @@ cpShape *world_shape_point_query(a_vec2 org_mxy);
 void world_move_shape(cpShape *mhape, cpVect curr_mxy);
 void world_rotate_shape(cpShape *mshape, double rad);
 void world_remove_shape(cpShape *shape);
+
+
 enum A_CON_TS{
     A_CON_NULL,A_CON_HINGE,A_CON_SPRING,A_CON_GEAR
 
 };
 
-void                     world_create_constraint(cpShape *shape, a_vec2 xy, unsigned long type);
-void                     world_create_constraint2(cpShape *shape,cpShape *second, a_vec2 xy, unsigned long type, double prop=1);
+cpConstraint*                     world_create_constraint(cpShape *shape, a_vec2 xy, unsigned long type);
+cpConstraint *world_create_constraint2(cpShape *shape,cpShape *second, a_vec2 xy, unsigned long type, double prop=1);
 
 enum A_BODY_TS{
     A_BODY_NULL,A_BODY_CIRCLE,A_BODY_POLY
@@ -35,3 +37,12 @@ struct shape_data{
     unsigned int type;
 };
 double world_get_tps();
+
+
+struct query_inf{
+    double dist;
+    cpShape *shape;
+    cpShape *mshape;
+};
+
+struct query_inf world_query_shape(cpShape *self, a_vec2 pos);

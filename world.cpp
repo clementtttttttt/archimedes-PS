@@ -230,20 +230,21 @@ void world_remove_shape(cpShape *shape){
 
     cpBodyEachConstraint(bod, [](cpBody *bod, cpConstraint *con, void *data){
         cpSpaceRemoveConstraint(cpBodyGetSpace(bod), con);
-        cpConstraintDestroy(con);
+        cpConstraintFree(con);
 
     },NULL);
 
 
     cpSpaceRemoveShape(space,shape);
-    cpShapeDestroy(shape);
+    cpShapeFree(shape);
     if(bod != cpSpaceGetStaticBody(cpBodyGetSpace(bod))){
                 cpSpaceRemoveBody(cpBodyGetSpace(bod), bod);
-                cpBodyDestroy(bod);
+                cpBodyFree(bod);
     }
 
     phys_tick_lock.unlock();
 }
+
 
 double world_default_density=2710; //aluminium
 
@@ -424,8 +425,43 @@ using N = unsigned long;
 
 
 }
+struct query_inf world_query_shape(cpShape *mshape, a_vec2 pos){
 
-void   world_create_constraint2(cpShape *shape, cpShape *shape2, a_vec2 xy, unsigned long type, double prop){
+
+                            struct query_inf inf = {INFINITY, NULL, mshape};
+
+
+                            cpSpacePointQuery(space, pos, 0, CP_SHAPE_FILTER_ALL,
+                            [](cpShape *shape, cpVect point, cpFloat dist, cpVect grad, void *data){
+                                struct query_inf *qinf = (struct query_inf*)data;
+                                struct shape_data *dat = (struct shape_data*)cpShapeGetUserData(shape);
+                                struct shape_data *q_dat;
+                                if(qinf->shape)
+                                    q_dat = (struct shape_data*)cpShapeGetUserData(qinf->shape);
+                                struct shape_data *m_dat;
+                                if(qinf->mshape)
+                                    m_dat = (struct shape_data*) cpShapeGetUserData(qinf->mshape);
+
+                                if(shape != qinf->mshape && (qinf->mshape? (dat->z <= m_dat->z): true)){
+                                    if((qinf->shape? (dat->z <= q_dat->z ): true)){
+                                        if(dat->z == q_dat->z){
+                                            if(dist < qinf->dist) goto skip;
+                                        }
+
+                                        qinf->shape = shape;
+                                        qinf->dist = dist;
+                                        skip:;
+
+                                    }
+
+                                }
+
+                            }
+                            ,&inf);
+        return inf;
+}
+
+cpConstraint*   world_create_constraint2(cpShape *shape, cpShape *shape2, a_vec2 xy, unsigned long type, double prop){
 
     phys_tick_lock.lock();
 
@@ -435,9 +471,19 @@ void   world_create_constraint2(cpShape *shape, cpShape *shape2, a_vec2 xy, unsi
         case A_CON_HINGE:
             con = cpPivotJointNew(bod, cpShapeGetBody(shape2 ),xy);
             break;
-        case A_CON_GEAR:
+        case A_CON_GEAR:{
             con = cpGearJointNew(bod, cpShapeGetBody(shape2), 0, prop);
 
+            double off = cpBodyGetAngle(cpConstraintGetBodyB(con)) - cpBodyGetAngle(cpConstraintGetBodyA(con));
+            cpGearJointSetPhase(con, off);
+            break;
+        }
+        case A_CON_SPRING:
+        {
+            con = cpDampedSpringNew(bod, cpShapeGetBody(shape2), cpvzero, cpvzero, prop, 99, 99);
+
+            break;
+        }
     }
 
     struct con_data *user_dat = new struct con_data;
@@ -447,16 +493,20 @@ void   world_create_constraint2(cpShape *shape, cpShape *shape2, a_vec2 xy, unsi
     cpConstraintSetUserData(con, user_dat);
 
     cpSpaceAddConstraint(space, con);
-    cpConstraintSetCollideBodies(con, cpFalse);
 
+    if(type != A_CON_SPRING){
+        cpConstraintSetCollideBodies(con, cpFalse);
+    }
     phys_tick_lock.unlock();
+
+    return con;
 
 
 }
 
-void                     world_create_constraint(cpShape *shape, a_vec2 xy, unsigned long type){
+cpConstraint*                     world_create_constraint(cpShape *shape, a_vec2 xy, unsigned long type){
 
-        world_create_constraint2(shape,ground,xy,type);
+        return world_create_constraint2(shape,ground,xy,type);
 
 
 }
